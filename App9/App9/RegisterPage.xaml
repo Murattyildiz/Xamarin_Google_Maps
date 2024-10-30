@@ -1,0 +1,20 @@
+﻿<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="App9.RegisterPage"
+             Title="Kayıt Ol">
+
+    <StackLayout Padding="20" Spacing="15" VerticalOptions="Center">
+
+        <!-- Kullanıcı Adı Giriş Kutusu -->
+        <Entry x:Name="registerUserName" Placeholder="Kullanıcı Adı" />
+
+        <!-- Şifre Giriş Kutusu -->
+        <Entry x:Name="registerUserPassword" Placeholder="Şifre" IsPassword="True" />
+
+        <!-- Kayıt Ol Butonu -->
+        <Button Text="Kayıt Ol" Clicked="OnRegisterClicked" BackgroundColor="#2196F3" TextColor="White"/>
+
+        <!-- Geri Dön Butonu -->
+        <Button Text="Geri Dön" Clicked="OnBackClicked" BackgroundColor="#f44336" TextColor="White"/>
+    </StackLayout>
+</ContentPage>
