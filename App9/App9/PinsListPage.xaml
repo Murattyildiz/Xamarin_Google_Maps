@@ -1,0 +1,25 @@
+﻿<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="App9.PinsListPage"
+             Title="Pins List">
+    <StackLayout>
+        <ListView x:Name="pinsListView">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <ViewCell>
+                        <StackLayout Orientation="Horizontal" Padding="10">
+                            <Label Text="{Binding Label}" 
+                                   VerticalOptions="Center" 
+                                   HorizontalOptions="StartAndExpand" />
+                            <Button Text="Sil" 
+                                    TextColor="Red" 
+                                    BackgroundColor="Transparent"
+                                    Clicked="OnDeletePinClicked" 
+                                    CommandParameter="{Binding .}" />
+                        </StackLayout>
+                    </ViewCell>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </StackLayout>
+</ContentPage>

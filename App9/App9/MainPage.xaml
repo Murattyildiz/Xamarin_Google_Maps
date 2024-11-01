@@ -26,8 +26,11 @@
                 BorderRadius="70"
                 BackgroundColor="LawnGreen"
                 Margin="10"/>
+        
 
         <Button Text="Kayıt Ol" Clicked="OnRegisterClicked" BackgroundColor="#4CAF50" TextColor="White"/>
 
+        
+        
     </StackLayout>
 </ContentPage>

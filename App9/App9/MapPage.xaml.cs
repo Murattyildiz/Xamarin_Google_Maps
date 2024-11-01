@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.Maps;
 using XamarinFormsMap = Xamarin.Forms.Maps.Map;
-using System.Net.Http;
-using Newtonsoft.Json.Linq;
-using System.Linq;
 
 namespace App9
 {
@@ -19,7 +17,6 @@ namespace App9
         private string filePath;
         private CustomPin startPin;
         private CustomPin endPin;
-        private Polyline routePolyline;
         private bool isSelectingStart = false;
         private bool isSelectingEnd = false;
 
@@ -40,7 +37,7 @@ namespace App9
                 VerticalOptions = LayoutOptions.FillAndExpand
             };
 
-            map.MapClicked += OnMapClicked; // Handles map taps for adding pins
+            map.MapClicked += OnMapClicked;
 
             var searchBar = new SearchBar { Placeholder = "Adres ara..." };
             searchBar.SearchButtonPressed += OnSearchButtonPressed;
@@ -54,40 +51,67 @@ namespace App9
             var routeButton = new Button { Text = "Rota Göster" };
             routeButton.Clicked += OnRouteButtonClicked;
 
+            var listPinsButton = new Button { Text = "İşaretli Noktaları Göster" };
+            listPinsButton.Clicked += OnListPinsButtonClicked;
+
             Content = new StackLayout
             {
-                Children = { searchBar, startButton, endButton, routeButton, map }
+                Children = { searchBar, startButton, endButton, routeButton, listPinsButton, map }
             };
 
-            var position = new Position(41.0082, 28.9784); // İstanbul
+            var position = new Position(41.0082, 28.9784); // Istanbul
             map.MoveToRegion(MapSpan.FromCenterAndRadius(position, Distance.FromKilometers(10)));
+        }
+
+        private async void OnListPinsButtonClicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new PinsListPage(customPins, this));
         }
 
         private async void OnSearchButtonPressed(object sender, EventArgs e)
         {
             var searchBar = (SearchBar)sender;
             var address = searchBar.Text;
-            var locations = await Geocoding.GetLocationsAsync(address);
 
-            var location = locations?.FirstOrDefault();
-            if (location != null)
+            if (Connectivity.NetworkAccess != NetworkAccess.Internet)
             {
-                var position = new Position(location.Latitude, location.Longitude);
-                map.MoveToRegion(MapSpan.FromCenterAndRadius(position, Distance.FromKilometers(1)));
-
-                var pin = new CustomPin
-                {
-                    Position = position,
-                    Label = address,
-                    Address = address,
-                    Type = PinType.SearchResult
-                };
-
-                map.Pins.Add(pin);
+                await DisplayAlert("Hata", "İnternet bağlantınız yok.", "Tamam");
+                return;
             }
-            else
+
+            try
             {
-                await DisplayAlert("Hata", "Adres bulunamadı", "Tamam");
+                var locations = await Geocoding.GetLocationsAsync(address);
+                var location = locations?.FirstOrDefault();
+                if (location != null)
+                {
+                    var position = new Position(location.Latitude, location.Longitude);
+                    map.MoveToRegion(MapSpan.FromCenterAndRadius(position, Distance.FromKilometers(1)));
+
+                    var pin = new CustomPin
+                    {
+                        Position = position,
+                        Label = address,
+                        Address = address,
+                        Type = PinType.SearchResult
+                    };
+
+                    map.Pins.Add(pin);
+                    customPins.Add(pin);
+                    SavePinToFile(pin);
+                }
+                else
+                {
+                    await DisplayAlert("Hata", "Adres bulunamadı", "Tamam");
+                }
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                await DisplayAlert("Hata", "Adres aramada zaman aşımı hatası oluştu. Lütfen tekrar deneyin.", "Tamam");
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Hata", $"Adres aramada hata oluştu: {ex.Message}", "Tamam");
             }
         }
 
@@ -112,8 +136,7 @@ namespace App9
                 await DisplayAlert("Hata", "Lütfen başlangıç ve bitiş noktalarını seçin", "Tamam");
                 return;
             }
-
-            await ShowRoute();
+            // await ShowRoute();
         }
 
         private async void OnMapClicked(object sender, MapClickedEventArgs e)
@@ -169,154 +192,50 @@ namespace App9
 
                     map.Pins.Add(customPin);
                     customPins.Add(customPin);
-
                     SavePinToFile(customPin);
                 }
             }
         }
 
-        private async Task ShowRoute()
-        {
-            if (startPin == null || endPin == null)
-            {
-                await DisplayAlert("Hata", "Lütfen başlangıç ve bitiş noktalarını seçin", "Tamam");
-                return;
-            }
-
-            // Google Maps Directions API URL oluşturma
-            string apiKey = "AIzaSyD83kkqqUivpMZNt5xcxISWZNFDhVKO1vI"; // Google Maps API anahtarınızı buraya ekleyin
-            string url = $"https://maps.googleapis.com/maps/api/directions/json?origin={startPin.Position.Latitude},{startPin.Position.Longitude}&destination={endPin.Position.Latitude},{endPin.Position.Longitude}&key={apiKey}";
-
-            try
-            {
-                using (HttpClient client = new HttpClient())
-                {
-                    var response = await client.GetStringAsync(url);
-                    var routeData = JObject.Parse(response);
-
-                    if (routeData["status"].ToString() == "OK")
-                    {
-                        var points = routeData["routes"][0]["overview_polyline"]["points"].ToString();
-                        var positions = DecodePolyline(points);
-
-                        if (routePolyline != null)
-                        {
-                            map.MapElements.Remove(routePolyline);
-                        }
-
-                        routePolyline = new Polyline
-                        {
-                            StrokeColor = Color.Blue,
-                            StrokeWidth = 3
-                        };
-
-                        foreach (var position in positions)
-                        {
-                            routePolyline.Geopath.Add(new Position(position.Latitude, position.Longitude));
-                        }
-
-                        map.MapElements.Add(routePolyline);
-                    }
-                    else
-                    {
-                        await DisplayAlert("Hata", "Rota alınamadı", "Tamam");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Hata", $"Rota alınırken bir hata oluştu: {ex.Message}", "Tamam");
-            }
-        }
-
-
-        // Polyline'ı çözmek için DecodePolyline methodu
-        public List<Position> DecodePolyline(string encodedPoints)
-        {
-            if (string.IsNullOrEmpty(encodedPoints)) return null;
-
-            var poly = new List<Position>();
-            char[] polylineChars = encodedPoints.ToCharArray();
-            int index = 0;
-
-            int currentLat = 0;
-            int currentLng = 0;
-
-            while (index < polylineChars.Length)
-            {
-                // Latitude decode
-                int sum = 0;
-                int shifter = 0;
-                int next5Bits;
-                do
-                {
-                    next5Bits = polylineChars[index++] - 63;
-                    sum |= (next5Bits & 31) << shifter;
-                    shifter += 5;
-                } while (next5Bits >= 32 && index < polylineChars.Length);
-
-                currentLat += (sum & 1) == 1 ? ~(sum >> 1) : (sum >> 1);
-
-                // Longitude decode
-                sum = 0;
-                shifter = 0;
-                do
-                {
-                    next5Bits = polylineChars[index++] - 63;
-                    sum |= (next5Bits & 31) << shifter;
-                    shifter += 5;
-                } while (next5Bits >= 32 && index < polylineChars.Length);
-
-                currentLng += (sum & 1) == 1 ? ~(sum >> 1) : (sum >> 1);
-
-                var position = new Position(Convert.ToDouble(currentLat) / 1E5, Convert.ToDouble(currentLng) / 1E5);
-                poly.Add(position);
-            }
-
-            return poly;
-        }
-
-
-        private void SavePinToFile(CustomPin pin)
-        {
-            string pinData = $"{pin.Position.Latitude},{pin.Position.Longitude},{pin.Label}\n";
-            File.AppendAllText(filePath, pinData);
-        }
-
         private void LoadPinsFromFile()
         {
-            if (File.Exists(filePath))
+            if (!File.Exists(filePath)) return;
+
+            foreach (var line in File.ReadLines(filePath))
             {
-                var lines = File.ReadAllLines(filePath);
-                foreach (var line in lines)
+                var parts = line.Split(',');
+                if (parts.Length == 3 &&
+                    double.TryParse(parts[0], out double lat) &&
+                    double.TryParse(parts[1], out double lng))
                 {
-                    var parts = line.Split(',');
-                    if (parts.Length >= 3)
+                    var customPin = new CustomPin
                     {
-                        double latitude = double.Parse(parts[0]);
-                        double longitude = double.Parse(parts[1]);
-                        string label = parts[2];
-
-                        var pin = new CustomPin
-                        {
-                            Position = new Position(latitude, longitude),
-                            Label = label,
-                            Address = "Özel Konum",
-                            Type = PinType.Generic
-                        };
-
-                        map.Pins.Add(pin);
-                        customPins.Add(pin);
-                    }
+                        Position = new Position(lat, lng),
+                        Label = parts[2],
+                        Type = PinType.Place
+                    };
+                    map.Pins.Add(customPin);
+                    customPins.Add(customPin);
                 }
             }
+        }
+
+        private void SavePinToFile(CustomPin customPin)
+        {
+            var line = $"{customPin.Position.Latitude},{customPin.Position.Longitude},{customPin.Label}";
+            File.AppendAllText(filePath, line + Environment.NewLine);
+        }
+
+        // RemovePinFromMap metodu
+        public void RemovePinFromMap(CustomPin pin)
+        {
+            map.Pins.Remove(pin);
+            customPins.Remove(pin);
         }
     }
 
     public class CustomPin : Pin
     {
-        public string Id { get; set; }
-        public string Url { get; set; }
         public Color PinColor { get; set; }
     }
 }

@@ -35,7 +35,7 @@ namespace App9
 
         private async void OnBackClicked(object sender, EventArgs e)
         {
-            await Navigation.PopAsync(); // Geri git
+            await Navigation.PopAsync(); 
         }
     }
 }
