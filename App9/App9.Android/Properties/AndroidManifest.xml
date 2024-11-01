@@ -20,7 +20,7 @@
 		<!-- Google Maps API anahtarı -->
 		<meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyD83kkqqUivpMZNt5xcxISWZNFDhVKO1vI" />
+            android:value="Api-Key yazılacak" />
 
 	</application>
 </manifest>
